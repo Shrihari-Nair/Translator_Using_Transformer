@@ -7,6 +7,7 @@ class LayerNormalization(nn.Module):
     def __init__(self, features: int, eps:float=10**-6) -> None:
         super().__init__()
         self.eps = eps
+        # alpha is multipled and bias is added. nn.Parameter -> makes the element learnable.
         self.alpha = nn.Parameter(torch.ones(features)) # alpha is a learnable parameter
         self.bias = nn.Parameter(torch.zeros(features)) # bias is a learnable parameter
 
@@ -99,7 +100,7 @@ class MultiHeadAttentionBlock(nn.Module):
         self.w_o = nn.Linear(d_model, d_model, bias=False) # Wo
         self.dropout = nn.Dropout(dropout)
 
-    @staticmethod
+    @staticmethod  # call attention without instantiation.
     def attention(query, key, value, mask, dropout: nn.Dropout):
         d_k = query.shape[-1]
         # Just apply the formula from the paper
@@ -120,7 +121,7 @@ class MultiHeadAttentionBlock(nn.Module):
         key = self.w_k(k) # (batch, seq_len, d_model) --> (batch, seq_len, d_model)
         value = self.w_v(v) # (batch, seq_len, d_model) --> (batch, seq_len, d_model)
 
-        # (batch, seq_len, d_model) --> (batch, seq_len, h, d_k) --> (batch, h, seq_len, d_k)
+        # (batch, seq_len, d_model) --> (batch, seq_len, h, d_k) -----(transpose)---> (batch, h, seq_len, d_k)
         query = query.view(query.shape[0], query.shape[1], self.h, self.d_k).transpose(1, 2)
         key = key.view(key.shape[0], key.shape[1], self.h, self.d_k).transpose(1, 2)
         value = value.view(value.shape[0], value.shape[1], self.h, self.d_k).transpose(1, 2)
@@ -159,7 +160,7 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
-        return self.norm(x)
+        return self.norm(x) 
 
 class DecoderBlock(nn.Module):
 
@@ -190,12 +191,13 @@ class Decoder(nn.Module):
 
 class ProjectionLayer(nn.Module):
 
-    def __init__(self, d_model, vocab_size) -> None:
+    def __init__(self, d_model : int, vocab_size : int) -> None:
         super().__init__()
         self.proj = nn.Linear(d_model, vocab_size)
 
     def forward(self, x) -> None:
         # (batch, seq_len, d_model) --> (batch, seq_len, vocab_size)
+        # return torch.log_softmax(self.proj(x), dim=-1)
         return self.proj(x)
     
 class Transformer(nn.Module):
